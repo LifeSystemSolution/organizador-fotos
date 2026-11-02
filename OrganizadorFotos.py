@@ -710,7 +710,7 @@ class App:
         self.update_preview()
         self.set_busy(False)
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.root.after(100, self.poll_queue)
+        self._poll_id = self.root.after(100, self.poll_queue)
 
         if not HAS_PIL:
             self.log("Pillow no está instalado: no se podrá leer el EXIF de las fotos. "
@@ -1220,15 +1220,18 @@ class App:
             self.stop()
             self.root.after(200, self._close_when_done)
             return
-        self.save_config()
-        self.root.destroy()
+        self._destroy()
 
     def _close_when_done(self):
         if self.worker and self.worker.is_alive():
             self.root.after(200, self._close_when_done)
         else:
-            self.save_config()
-            self.root.destroy()
+            self._destroy()
+
+    def _destroy(self):
+        self.save_config()
+        self.root.after_cancel(self._poll_id)
+        self.root.destroy()
 
     # ---------- mensajes del hilo ----------
     def poll_queue(self):
@@ -1238,7 +1241,7 @@ class App:
         except queue.Empty:
             pass
         if not self.closing or (self.worker and self.worker.is_alive()):
-            self.root.after(80, self.poll_queue)
+            self._poll_id = self.root.after(80, self.poll_queue)
 
     def set_progress(self, value, maximum):
         if str(self.progress["mode"]) == "indeterminate":
